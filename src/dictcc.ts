@@ -1,16 +1,19 @@
-import { Languages } from './languages'
-import {
-  getHtmlString,
-  getTranslationsColumns,
-  getTranslationsArray,
-  getTranslationsIds,
-  getTranslationsAudioUrls,
-  createDictccUrl,
-} from './parser'
-import { TranslationInput, TranslationResult } from './types'
-import { prepareData } from './utils'
+import { Languages } from './constants/enum'
+import { TranslationInput, DictccResponse } from './types'
+import { getTranslationQuery, fetchTranslations } from './services/api'
+import translationsSerialiser from './serialisers/translations'
+import inflectionsSerialiser from './serialisers/inflections'
 
-export default async (input: TranslationInput): Promise<TranslationResult> => {
+const EMPTY_RESPONSE: DictccResponse = {
+  data: {
+    translations: [],
+    inflections: undefined,
+  },
+  url: undefined,
+  error: undefined,
+}
+
+export default async (input: TranslationInput): Promise<DictccResponse> => {
   const { sourceLanguage, targetLanguage, term } = input
 
   // this should ideally never happen as the input is typed.
@@ -24,45 +27,34 @@ export default async (input: TranslationInput): Promise<TranslationResult> => {
     }
   }
 
-  const url = createDictccUrl(input)
+  if (term.length === 0) {
+    return EMPTY_RESPONSE
+  }
+
+  const url = getTranslationQuery(input)
 
   try {
-    const body = await getHtmlString(url)
-    const translations = getTranslationsArray(body)
-    const translationsIds = getTranslationsIds(body)
+    const apiResponse = await fetchTranslations(url)
 
-    /**
-     * There are no translations available for this term in the given languages.
-     */
-    if (!translations[0] || !translations[1]) {
-      return {
-        data: [],
-        url,
-        error: undefined,
-      }
+    if (apiResponse.translations.length === 0) {
+      return EMPTY_RESPONSE
     }
 
-    const { translationsLeft, translationsRight } = getTranslationsColumns(body)
-    const audioUrls = getTranslationsAudioUrls(
-      translationsIds,
+    apiResponse.translations.sort((a, b) => a.sort_num - b.sort_num)
+
+    const translations = translationsSerialiser(
       sourceLanguage,
       targetLanguage,
+      apiResponse.translations,
     )
 
-    /**
-     * Sometimes the from-translation is in the right-column and sometimes
-     * it is in the left-column. We determine which one is which by looking
-     * up the search term in the list of translated words.
-     */
-    let data
-    if (translations[0].includes(term)) {
-      data = prepareData(translationsRight, translationsLeft, audioUrls)
-    } else {
-      data = prepareData(translationsLeft, translationsRight, audioUrls)
-    }
+    const inflections = inflectionsSerialiser(apiResponse)
 
     return {
-      data,
+      data: {
+        translations,
+        inflections,
+      },
       url,
       error: undefined,
     }
