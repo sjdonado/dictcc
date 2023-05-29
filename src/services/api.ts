@@ -5,11 +5,13 @@ import { ApiResponse, TranslationInput } from '../types'
 export const getTranslationQuery = ({
   sourceLanguage,
   targetLanguage,
+  direction,
   term,
 }: TranslationInput) => {
   const url = new URL('https://www.dict.cc/syn/app_translations.php')
 
   url.searchParams.set('s', term)
+  url.searchParams.set('dir', direction)
   url.searchParams.set(
     'lp',
     `${sourceLanguage.toUpperCase()}${targetLanguage.toUpperCase()}`,

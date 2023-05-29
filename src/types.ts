@@ -1,8 +1,14 @@
 import { Languages } from './constants/enum'
 
+export enum Direction {
+  LTR = '1',
+  RTL = '2',
+}
+
 export type TranslationInput = {
   sourceLanguage: Languages
   targetLanguage: Languages
+  direction: Direction
   term: string
 }
 
